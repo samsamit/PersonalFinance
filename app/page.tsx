@@ -3,32 +3,13 @@
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
-export default function Home() {
-  const [count, setCount] = useState(0);
-
-  const incrementCounter = async () => {
-    try {
-      const response = await fetch('/api/counter', {
-        method: 'POST',
-      });
-      const data = await response.json();
-      setCount(data.count);
-    } catch (error) {
-      console.error('Error incrementing counter:', error);
-    }
-  };
-
+export default function DashboardPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
-        <h1 className="text-4xl font-bold text-primary">Personal Finance</h1>
-        <p className="mt-4 text-lg text-muted-foreground">Track and manage your personal finances</p>
-        <Button
-          onClick={incrementCounter}
-        >
-          Count: {count}
-        </Button>
-      </div>
-    </main>
-  );
+    <div className="container mx-auto py-8">
+      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <p className="text-muted-foreground">
+        Welcome to your personal finance dashboard. Use the navigation menu to access different features.
+      </p>
+    </div>
+  )
 } 

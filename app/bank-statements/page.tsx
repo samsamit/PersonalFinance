@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -19,33 +19,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-
-interface Transaction {
-  date: string
-  description: string
-  amount: number
-  type: 'credit' | 'debit'
-}
-
-interface ColumnMapping {
-  date: string
-  description: string
-  amount: string
-}
+import { CSVFieldConfig, Transaction, ColumnMapping } from '@/lib/types'
+import { loadCSVFieldConfigs } from '@/lib/utils/csvConfig'
+import { toast } from "sonner"
 
 function parseCSVRow(row: string): string[] {
-  // Handle empty or undefined rows
   if (!row || row.trim() === '') {
     return [];
   }
 
-  // Split by comma but handle quoted values
   const values: string[] = row.split(';');
 
-  // Clean up the values by removing quotes and trimming
   return values.map(value => {
     value = value.trim();
-    // Remove surrounding quotes if they exist
     if (value.startsWith('"') && value.endsWith('"')) {
       value = value.slice(1, -1);
     }
@@ -56,8 +42,15 @@ function parseCSVRow(row: string): string[] {
 export default function BankStatementsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [headers, setHeaders] = useState<string[]>([])
-  const [columnMapping, setColumnMapping] = useState<Partial<ColumnMapping>>({})
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({})
   const [csvContent, setCsvContent] = useState<string[][]>([])
+  const [fields, setFields] = useState<CSVFieldConfig[]>([])
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    const configs = loadCSVFieldConfigs()
+    setFields(configs)
+  }, [])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -65,14 +58,12 @@ export default function BankStatementsPage() {
 
     try {
       const text = await file.text()
-      // Split into rows and remove empty lines
       const rows = text.split('\n').filter(row => row.trim() !== '')
       
       if (rows.length < 2) {
         throw new Error('CSV file must contain at least a header row and one data row')
       }
 
-      // Parse headers
       const headerRow = rows[0]
       const parsedHeaders = parseCSVRow(headerRow)
       
@@ -80,10 +71,9 @@ export default function BankStatementsPage() {
         throw new Error('CSV file must contain at least 3 columns')
       }
 
-      // Parse content rows
       const parsedContent = rows.slice(1)
         .map(row => parseCSVRow(row))
-        .filter(row => row.length === parsedHeaders.length) // Only keep rows with correct number of columns
+        .filter(row => row.length === parsedHeaders.length)
       
       if (parsedContent.length === 0) {
         throw new Error('No valid data rows found in CSV file')
@@ -99,56 +89,73 @@ export default function BankStatementsPage() {
     }
   }
 
-  const handleColumnMappingChange = (field: keyof ColumnMapping, value: string) => {
+  const handleColumnMappingChange = (fieldId: string, value: string) => {
     const newMapping = {
       ...columnMapping,
-      [field]: value
+      [fieldId]: value
     }
     setColumnMapping(newMapping)
 
-    // Automatically process when all mappings are complete
-    if (newMapping.date && newMapping.description && newMapping.amount) {
-      processTransactions()
+    // Check if all required fields are mapped
+    const requiredFields = fields.filter(field => field.required)
+    const allRequiredFieldsMapped = requiredFields.every(field => newMapping[field.id])
+
+    if (allRequiredFieldsMapped) {
+      processTransactions(newMapping)
     }
   }
 
-  const processTransactions = () => {
-    const { date, description, amount } = columnMapping
-    if (!date || !description || !amount || !csvContent.length) return
+  const processTransactions = (mapping: ColumnMapping = columnMapping) => {
+    if (!csvContent.length) return
 
-    const dateIndex = headers.indexOf(date)
-    const descriptionIndex = headers.indexOf(description)
-    const amountIndex = headers.indexOf(amount)
+    const parsedTransactions = csvContent.map(row => {
+      const transaction: Transaction = {
+        date: '',
+        description: '',
+        amount: 0,
+        type: 'debit'
+      }
 
-    if (dateIndex === -1 || descriptionIndex === -1 || amountIndex === -1) {
-      alert('Invalid column mapping. Please check your column selections.')
-      return
-    }
+      // Process each field according to its configuration
+      fields.forEach(field => {
+        const columnIndex = headers.indexOf(mapping[field.id] || '')
+        if (columnIndex === -1) return
 
-    const parsedTransactions = csvContent
-      .filter(row => row.length > Math.max(dateIndex, descriptionIndex, amountIndex))
-      .map(row => {
-        // Get the raw amount string
-        const amountStr = row[amountIndex].trim()
-        
-        // Convert European number format to standard format:
-        // 1. Remove any spaces (thousand separators in EU format)
-        // 2. Replace comma with period for decimal point
-        const standardizedAmount = amountStr
-          .replace(/\s+/g, '')  // Remove spaces
-          .replace(/\./g, '')   // Remove dots (thousand separators)
-          .replace(',', '.')    // Replace comma with period for decimal
+        const value = row[columnIndex]?.trim() || ''
 
-        const amount = parseFloat(standardizedAmount)
-
-        return {
-          date: row[dateIndex],
-          description: row[descriptionIndex],
-          amount,
-          type: amount >= 0 ? 'credit' as const : 'debit' as const
+        switch (field.id) {
+          case 'amount': {
+            // Convert European number format to standard format
+            const standardizedAmount = value
+              .replace(/\s+/g, '')
+              .replace(/\./g, '')
+              .replace(',', '.')
+            const amount = parseFloat(standardizedAmount)
+            transaction.amount = amount
+            transaction.type = amount >= 0 ? 'credit' : 'debit'
+            break
+          }
+          case 'date':
+            transaction.date = value
+            break
+          case 'description':
+            transaction.description = value
+            break
+          default:
+            // Handle custom fields based on their type
+            if (field.type === 'number') {
+              const num = parseFloat(value.replace(',', '.'))
+              if (!isNaN(num)) {
+                transaction[field.id] = num
+              }
+            } else {
+              transaction[field.id] = value
+            }
         }
       })
-      .filter(transaction => !isNaN(transaction.amount))
+
+      return transaction
+    }).filter(transaction => !isNaN(transaction.amount))
 
     setTransactions(parsedTransactions)
   }
@@ -160,14 +167,39 @@ export default function BankStatementsPage() {
     setColumnMapping({})
   }
 
-  const isColumnMappingComplete = Boolean(
-    columnMapping.date && 
-    columnMapping.description && 
-    columnMapping.amount
-  )
+  const isColumnMappingComplete = fields
+    .filter(field => field.required)
+    .every(field => columnMapping[field.id])
+
+  const handleSave = async () => {
+    if (!transactions.length) return
+
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/bank-statements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactions),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save bank statements')
+      }
+
+      const result = await response.json()
+      toast.success(`Successfully saved ${result.count} transactions`)
+    } catch (error) {
+      console.error('Error saving bank statements:', error)
+      toast.error('Failed to save bank statements')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="p-8">
       <h1 className="text-2xl font-bold mb-6">Bank Statements</h1>
       
       <div className="mb-8">
@@ -184,54 +216,29 @@ export default function BankStatementsPage() {
           <div className="mt-4 p-4 border rounded-lg">
             <h2 className="text-lg font-semibold mb-4">Map CSV Columns</h2>
             <div className="grid gap-4 max-w-xl">
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <label>Date Column:</label>
-                <Select onValueChange={(value: string) => handleColumnMappingChange('date', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select date column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {headers.map((header) => (
-                      <SelectItem key={header} value={header}>
-                        {header}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <label>Description Column:</label>
-                <Select onValueChange={(value: string) => handleColumnMappingChange('description', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select description column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {headers.map((header) => (
-                      <SelectItem key={header} value={header}>
-                        {header}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <label>Amount Column:</label>
-                <Select onValueChange={(value: string) => handleColumnMappingChange('amount', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select amount column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {headers.map((header) => (
-                      <SelectItem key={header} value={header}>
-                        {header}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {fields.map(field => (
+                <div key={field.id} className="grid grid-cols-2 gap-4 items-center">
+                  <label>
+                    {field.name}
+                    {field.required && <span className="text-red-500 ml-1">*</span>}:
+                  </label>
+                  <Select onValueChange={(value) => handleColumnMappingChange(field.id, value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select ${field.name.toLowerCase()} column`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {headers.map((header) => (
+                        <SelectItem key={header} value={header}>
+                          {header}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
               <Button 
                 className="mt-2"
-                onClick={processTransactions}
+                onClick={() => processTransactions()}
                 disabled={!isColumnMappingComplete}
               >
                 Process Transactions
@@ -242,33 +249,50 @@ export default function BankStatementsPage() {
       </div>
 
       {transactions.length > 0 && (
-        <Table>
-          <TableCaption>Your bank statement transactions</TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Type</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {transactions.map((transaction, index) => (
-              <TableRow key={index}>
-                <TableCell>{transaction.date}</TableCell>
-                <TableCell>{transaction.description}</TableCell>
-                <TableCell className="text-right">
-                  {transaction.amount.toFixed(2)}
-                </TableCell>
-                <TableCell>
-                  <span className={transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'}>
-                    {transaction.type}
-                  </span>
-                </TableCell>
+        <>
+          <div className="flex justify-end mb-4">
+            <Button 
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save Transactions'}
+            </Button>
+          </div>
+          <Table>
+            <TableCaption>Your bank statement transactions</TableCaption>
+            <TableHeader>
+              <TableRow>
+                {fields.map(field => (
+                  <TableHead key={field.id} className={field.type === 'number' ? 'text-right' : ''}>
+                    {field.name}
+                  </TableHead>
+                ))}
+                <TableHead>Type</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {transactions.map((transaction, index) => (
+                <TableRow key={index}>
+                  {fields.map(field => (
+                    <TableCell 
+                      key={field.id}
+                      className={field.type === 'number' ? 'text-right' : ''}
+                    >
+                      {field.type === 'number' && typeof transaction[field.id] === 'number'
+                        ? (transaction[field.id] as number).toFixed(2)
+                        : transaction[field.id]?.toString() || ''}
+                    </TableCell>
+                  ))}
+                  <TableCell>
+                    <span className={transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'}>
+                      {transaction.type}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </>
       )}
 
       {!transactions.length && !headers.length && (
