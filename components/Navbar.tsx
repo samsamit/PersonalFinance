@@ -11,7 +11,12 @@ export function Navbar() {
           Personal Finance
         </Link>
         <div className="flex items-center gap-4">
-          {/* Add navigation items here as needed */}
+          <Link 
+            href="/bank-statements" 
+            className="text-sm hover:text-primary transition-colors"
+          >
+            Bank Statements
+          </Link>
         </div>
       </div>
     </nav>
