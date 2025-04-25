@@ -100,10 +100,16 @@ export default function BankStatementsPage() {
   }
 
   const handleColumnMappingChange = (field: keyof ColumnMapping, value: string) => {
-    setColumnMapping(prev => ({
-      ...prev,
+    const newMapping = {
+      ...columnMapping,
       [field]: value
-    }))
+    }
+    setColumnMapping(newMapping)
+
+    // Automatically process when all mappings are complete
+    if (newMapping.date && newMapping.description && newMapping.amount) {
+      processTransactions()
+    }
   }
 
   const processTransactions = () => {
@@ -122,7 +128,18 @@ export default function BankStatementsPage() {
     const parsedTransactions = csvContent
       .filter(row => row.length > Math.max(dateIndex, descriptionIndex, amountIndex))
       .map(row => {
-        const amount = parseFloat(row[amountIndex].replace(/[^-0-9.]/g, ''))
+        // Get the raw amount string
+        const amountStr = row[amountIndex].trim()
+        
+        // Convert European number format to standard format:
+        // 1. Remove any spaces (thousand separators in EU format)
+        // 2. Replace comma with period for decimal point
+        const standardizedAmount = amountStr
+          .replace(/\s+/g, '')  // Remove spaces
+          .replace(/\./g, '')   // Remove dots (thousand separators)
+          .replace(',', '.')    // Replace comma with period for decimal
+
+        const amount = parseFloat(standardizedAmount)
 
         return {
           date: row[dateIndex],
@@ -163,7 +180,7 @@ export default function BankStatementsPage() {
           />
           <Button variant="outline" onClick={handleClear}>Clear</Button>
         </div>
-        {headers.length > 0 && !isColumnMappingComplete && (
+        {headers.length > 0 && !transactions.length && (
           <div className="mt-4 p-4 border rounded-lg">
             <h2 className="text-lg font-semibold mb-4">Map CSV Columns</h2>
             <div className="grid gap-4 max-w-xl">
