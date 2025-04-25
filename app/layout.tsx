@@ -19,9 +19,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="flex">
+        <div className="flex min-h-screen bg-background">
           <Navigation />
-          <main className="flex-1 min-h-screen">{children}</main>
+          <main className="flex-1 overflow-x-hidden">
+            <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
+              {children}
+            </div>
+          </main>
         </div>
         <Toaster />
       </body>

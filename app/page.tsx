@@ -106,7 +106,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
+      <div>
         <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
         <p>Loading...</p>
       </div>
@@ -115,7 +115,7 @@ export default function DashboardPage() {
 
   if (!transactions.length) {
     return (
-      <div className="container mx-auto py-8">
+      <div>
         <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
         <p className="text-muted-foreground">
           No transactions found. Please upload your bank statements first.
@@ -125,18 +125,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Financial Dashboard</h1>
+    <div>
+      <h1 className="text-2xl font-bold mb-8">Financial Dashboard</h1>
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
         {/* Balance Over Time Chart */}
-        <Card>
+        <Card className="col-span-full xl:col-span-2">
           <CardHeader>
             <CardTitle>Balance Over Time</CardTitle>
             <CardDescription>Your account balance progression</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[300px] sm:h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={processedData.balanceOverTime}>
                   <CartesianGrid strokeDasharray="3 3" />
