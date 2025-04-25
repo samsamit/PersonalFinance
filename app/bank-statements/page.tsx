@@ -88,25 +88,28 @@ export default function BankStatementsPage() {
       setCsvContent(parsedContent)
       setColumnMapping({})
       setTransactions([])
+
+      // If a template is selected, automatically process with that template
+      if (selectedTemplateId) {
+        const template = templates.find(t => t.id === selectedTemplateId)
+        if (template) {
+          processTransactions(template.columnMappings)
+        }
+      }
     } catch (error) {
       console.error('Error parsing file:', error)
-      alert(error instanceof Error ? error.message : 'Error parsing file. Please make sure it\'s a valid CSV file.')
+      toast.error(error instanceof Error ? error.message : 'Error parsing file. Please make sure it\'s a valid CSV file.')
     }
   }
 
-  const handleColumnMappingChange = (fieldId: string, value: string) => {
-    const newMapping = {
-      ...columnMapping,
-      [fieldId]: value
-    }
-    setColumnMapping(newMapping)
-
-    // Check if all required fields are mapped
-    const requiredFields = fields.filter(field => field.required)
-    const allRequiredFieldsMapped = requiredFields.every(field => newMapping[field.id])
-
-    if (allRequiredFieldsMapped) {
-      processTransactions(newMapping)
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId)
+    if (template) {
+      setSelectedTemplateId(templateId)
+      setColumnMapping(template.columnMappings)
+      if (csvContent.length > 0) {
+        processTransactions(template.columnMappings)
+      }
     }
   }
 
@@ -165,28 +168,18 @@ export default function BankStatementsPage() {
     setTransactions(parsedTransactions)
   }
 
-  const handleTemplateSelect = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId)
-    if (template) {
-      setSelectedTemplateId(templateId)
-      setColumnMapping(template.columnMappings)
-      if (csvContent.length > 0) {
-        processTransactions(template.columnMappings)
-      }
-    }
-  }
-
   const handleClear = () => {
     setTransactions([])
     setHeaders([])
     setCsvContent([])
     setColumnMapping({})
     setSelectedTemplateId('')
+    // Also clear the file input
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    if (fileInput) {
+      fileInput.value = ''
+    }
   }
-
-  const isColumnMappingComplete = fields
-    .filter(field => field.required)
-    .every(field => columnMapping[field.id])
 
   const handleSave = async () => {
     if (!transactions.length) return
@@ -207,6 +200,7 @@ export default function BankStatementsPage() {
 
       const result = await response.json()
       toast.success(`Successfully saved ${result.count} transactions`)
+      handleClear() // Clear everything after successful save
     } catch (error) {
       console.error('Error saving bank statements:', error)
       toast.error('Failed to save bank statements')
@@ -241,40 +235,6 @@ export default function BankStatementsPage() {
           </Select>
           <Button variant="outline" onClick={handleClear}>Clear</Button>
         </div>
-        {headers.length > 0 && !transactions.length && !selectedTemplateId && (
-          <div className="mt-4 p-4 border rounded-lg">
-            <h2 className="text-lg font-semibold mb-4">Map CSV Columns</h2>
-            <div className="grid gap-4 max-w-xl">
-              {fields.map(field => (
-                <div key={field.id} className="grid grid-cols-2 gap-4 items-center">
-                  <label>
-                    {field.name}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}:
-                  </label>
-                  <Select onValueChange={(value) => handleColumnMappingChange(field.id, value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={`Select ${field.name.toLowerCase()} column`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {headers.map((header) => (
-                        <SelectItem key={header} value={header}>
-                          {header}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-              <Button 
-                className="mt-2"
-                onClick={() => processTransactions()}
-                disabled={!isColumnMappingComplete}
-              >
-                Process Transactions
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
       {transactions.length > 0 && (
@@ -324,9 +284,9 @@ export default function BankStatementsPage() {
         </>
       )}
 
-      {!transactions.length && !headers.length && !selectedTemplateId && (
+      {!transactions.length && !headers.length && (
         <div className="text-center text-muted-foreground">
-          Upload a CSV file to get started. The file can have any column headers - you'll be able to map them after upload.
+          Upload a CSV file to get started. Select a template to automatically map the columns.
         </div>
       )}
     </div>

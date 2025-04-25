@@ -128,15 +128,14 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-2xl font-bold mb-8">Financial Dashboard</h1>
       
-      <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 sm:grid-cols-1">
         {/* Balance Over Time Chart */}
-        <Card className="col-span-full xl:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle>Balance Over Time</CardTitle>
             <CardDescription>Your account balance progression</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-[300px] sm:h-[400px]">
+          <CardContent className='h-[300px]'>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={processedData.balanceOverTime}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -152,7 +151,6 @@ export default function DashboardPage() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
           </CardContent>
         </Card>
 
@@ -162,8 +160,7 @@ export default function DashboardPage() {
             <CardTitle>Income vs Expenses</CardTitle>
             <CardDescription>Distribution of your financial flows</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
+          <CardContent className='h-[300px]'>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -183,18 +180,16 @@ export default function DashboardPage() {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
           </CardContent>
         </Card>
 
         {/* Monthly Income vs Expenses Bar Chart */}
-        <Card className="md:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle>Monthly Income vs Expenses</CardTitle>
             <CardDescription>Compare your monthly income and expenses</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
+          <CardContent className='h-[300px]' >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={processedData.monthlyTotals}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -206,7 +201,6 @@ export default function DashboardPage() {
                   <Bar dataKey="Expenses" fill="#FF8042" />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
           </CardContent>
         </Card>
       </div>
