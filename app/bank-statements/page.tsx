@@ -19,8 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { CSVFieldConfig, Transaction, ColumnMapping } from '@/lib/types'
+import { CSVFieldConfig, Transaction, ColumnMapping, CSVTemplate } from '@/lib/types'
 import { loadCSVFieldConfigs } from '@/lib/utils/csvConfig'
+import { loadCSVTemplates } from '@/lib/utils/csvTemplates'
 import { toast } from "sonner"
 
 function parseCSVRow(row: string): string[] {
@@ -46,10 +47,14 @@ export default function BankStatementsPage() {
   const [csvContent, setCsvContent] = useState<string[][]>([])
   const [fields, setFields] = useState<CSVFieldConfig[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [templates, setTemplates] = useState<CSVTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
 
   useEffect(() => {
     const configs = loadCSVFieldConfigs()
+    const loadedTemplates = loadCSVTemplates()
     setFields(configs)
+    setTemplates(loadedTemplates)
   }, [])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,11 +165,23 @@ export default function BankStatementsPage() {
     setTransactions(parsedTransactions)
   }
 
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId)
+    if (template) {
+      setSelectedTemplateId(templateId)
+      setColumnMapping(template.columnMappings)
+      if (csvContent.length > 0) {
+        processTransactions(template.columnMappings)
+      }
+    }
+  }
+
   const handleClear = () => {
     setTransactions([])
     setHeaders([])
     setCsvContent([])
     setColumnMapping({})
+    setSelectedTemplateId('')
   }
 
   const isColumnMappingComplete = fields
@@ -210,9 +227,21 @@ export default function BankStatementsPage() {
             onChange={handleFileUpload}
             className="max-w-xs"
           />
+          <Select value={selectedTemplateId} onValueChange={handleTemplateSelect}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select template" />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  {template.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" onClick={handleClear}>Clear</Button>
         </div>
-        {headers.length > 0 && !transactions.length && (
+        {headers.length > 0 && !transactions.length && !selectedTemplateId && (
           <div className="mt-4 p-4 border rounded-lg">
             <h2 className="text-lg font-semibold mb-4">Map CSV Columns</h2>
             <div className="grid gap-4 max-w-xl">
@@ -295,7 +324,7 @@ export default function BankStatementsPage() {
         </>
       )}
 
-      {!transactions.length && !headers.length && (
+      {!transactions.length && !headers.length && !selectedTemplateId && (
         <div className="text-center text-muted-foreground">
           Upload a CSV file to get started. The file can have any column headers - you'll be able to map them after upload.
         </div>

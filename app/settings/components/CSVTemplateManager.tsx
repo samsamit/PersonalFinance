@@ -26,6 +26,7 @@ import {
   loadCSVTemplates, 
   saveCSVTemplates, 
   createCSVTemplate,
+  updateCSVTemplate,
   DEFAULT_DATE_FORMATS,
   DELIMITERS
 } from '@/lib/utils/csvTemplates'
@@ -37,7 +38,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 export function CSVTemplateManager() {
   const [templates, setTemplates] = useState<CSVTemplate[]>([])
   const [fields, setFields] = useState<CSVFieldConfig[]>([])
-  const [newTemplate, setNewTemplate] = useState<CSVTemplateFormData>({
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null)
+  const [formData, setFormData] = useState<CSVTemplateFormData>({
     name: '',
     description: '',
     delimiter: ',',
@@ -52,21 +54,45 @@ export function CSVTemplateManager() {
     setFields(loadedFields)
   }, [])
 
-  const handleAddTemplate = () => {
-    if (!newTemplate.name) return
-
-    const template = createCSVTemplate(newTemplate)
-    const updatedTemplates = [...templates, template]
-    setTemplates(updatedTemplates)
-    saveCSVTemplates(updatedTemplates)
-
-    // Reset form
-    setNewTemplate({
+  const resetForm = () => {
+    setFormData({
       name: '',
       description: '',
       delimiter: ',',
       dateFormat: 'YYYY-MM-DD',
       columnMappings: {}
+    })
+    setEditingTemplate(null)
+  }
+
+  const handleSaveTemplate = () => {
+    if (!formData.name) return
+
+    let updatedTemplates: CSVTemplate[]
+    
+    if (editingTemplate) {
+      const template = updateCSVTemplate(editingTemplate, formData)
+      updatedTemplates = templates.map(t => 
+        t.id === editingTemplate ? template : t
+      )
+    } else {
+      const template = createCSVTemplate(formData)
+      updatedTemplates = [...templates, template]
+    }
+
+    setTemplates(updatedTemplates)
+    saveCSVTemplates(updatedTemplates)
+    resetForm()
+  }
+
+  const handleEditTemplate = (template: CSVTemplate) => {
+    setEditingTemplate(template.id)
+    setFormData({
+      name: template.name,
+      description: template.description,
+      delimiter: template.delimiter,
+      dateFormat: template.dateFormat,
+      columnMappings: template.columnMappings
     })
   }
 
@@ -74,10 +100,13 @@ export function CSVTemplateManager() {
     const updatedTemplates = templates.filter(template => template.id !== id)
     setTemplates(updatedTemplates)
     saveCSVTemplates(updatedTemplates)
+    if (editingTemplate === id) {
+      resetForm()
+    }
   }
 
   const handleColumnMappingChange = (fieldId: string, columnName: string) => {
-    setNewTemplate(prev => ({
+    setFormData(prev => ({
       ...prev,
       columnMappings: {
         ...prev.columnMappings,
@@ -92,7 +121,9 @@ export function CSVTemplateManager() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Template Details</CardTitle>
+              <CardTitle>
+                {editingTemplate ? 'Edit Template' : 'Create New Template'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
@@ -100,8 +131,8 @@ export function CSVTemplateManager() {
                   <Label htmlFor="name">Template Name</Label>
                   <Input
                     id="name"
-                    value={newTemplate.name}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Enter template name"
                   />
                 </div>
@@ -110,8 +141,8 @@ export function CSVTemplateManager() {
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
-                    value={newTemplate.description}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Enter template description"
                   />
                 </div>
@@ -120,8 +151,8 @@ export function CSVTemplateManager() {
                   <div className="grid gap-2">
                     <Label htmlFor="delimiter">CSV Delimiter</Label>
                     <Select
-                      value={newTemplate.delimiter}
-                      onValueChange={(value) => setNewTemplate({ ...newTemplate, delimiter: value as ',' | ';' | '\t' | '|' })}
+                      value={formData.delimiter}
+                      onValueChange={(value) => setFormData({ ...formData, delimiter: value as ',' | ';' | '\t' | '|' })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select delimiter" />
@@ -137,8 +168,8 @@ export function CSVTemplateManager() {
                   <div className="grid gap-2">
                     <Label htmlFor="dateFormat">Date Format</Label>
                     <Select
-                      value={newTemplate.dateFormat}
-                      onValueChange={(value) => setNewTemplate({ ...newTemplate, dateFormat: value })}
+                      value={formData.dateFormat}
+                      onValueChange={(value) => setFormData({ ...formData, dateFormat: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select date format" />
@@ -162,16 +193,25 @@ export function CSVTemplateManager() {
             <CardContent>
               <CSVPreviewMapping
                 fields={fields}
-                delimiter={newTemplate.delimiter}
+                delimiter={formData.delimiter}
                 onColumnMappingChange={handleColumnMappingChange}
-                columnMappings={newTemplate.columnMappings}
+                columnMappings={formData.columnMappings}
               />
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button onClick={handleAddTemplate} disabled={!newTemplate.name} className="w-full sm:w-auto">
-              Save Template
+          <div className="flex justify-end gap-2">
+            {editingTemplate && (
+              <Button variant="outline" onClick={resetForm}>
+                Cancel
+              </Button>
+            )}
+            <Button 
+              onClick={handleSaveTemplate} 
+              disabled={!formData.name}
+              className="w-full sm:w-auto"
+            >
+              {editingTemplate ? 'Update Template' : 'Save Template'}
             </Button>
           </div>
         </div>
@@ -205,6 +245,13 @@ export function CSVTemplateManager() {
                         <TableCell className="hidden sm:table-cell">{template.dateFormat}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditTemplate(template)}
+                            >
+                              Edit
+                            </Button>
                             <Button
                               variant="destructive"
                               size="sm"
