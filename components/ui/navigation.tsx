@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  Search
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
@@ -107,6 +108,12 @@ export function Navigation() {
             href="/bank-statements"
             icon={<FileSpreadsheet className="h-4 w-4" />}
             label="Bank Statements"
+            isCollapsed={isCollapsed}
+          />
+          <NavItem
+            href="/bank-statements/browse"
+            icon={<Search className="h-4 w-4" />}
+            label="Browse Statements"
             isCollapsed={isCollapsed}
           />
           <NavItem
