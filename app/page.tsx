@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
 export default function Home() {
@@ -22,12 +23,11 @@ export default function Home() {
       <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
         <h1 className="text-4xl font-bold text-primary">Personal Finance</h1>
         <p className="mt-4 text-lg text-muted-foreground">Track and manage your personal finances</p>
-        <button
+        <Button
           onClick={incrementCounter}
-          className="mt-8 px-4 py-2 bg- text-primary-foreground rounded-md hover:bg-primary/90"
         >
           Count: {count}
-        </button>
+        </Button>
       </div>
     </main>
   );
